@@ -1,13 +1,6 @@
 #include <stdio.h>
-
-
-typedef struct Node{
-    int m_remainedFriends;
-    int m_reminedRivals;
-    void* m_data;
-    struct Node* m_prevNode;
-    struct Node* m_nextNode;
-}* Node;
+#include <stdlib.h>
+#include "Node.h"
 
 Node createNode(void* item, int friendQuota, int rivalQuota){
     Node ptr = malloc(sizeof(*ptr));
@@ -22,26 +15,23 @@ Node createNode(void* item, int friendQuota, int rivalQuota){
     return ptr;
 }
 
-Node connectNode(Node node, void* item,int friendQuota, int rivalQuota){
-    Node newNode = createNode(item, friendQuota, rivalQuota);
-    if(!newNode){
-        return NULL;
+void connectNodes(Node firstNode, Node secondNode){
+    if(firstNode == NULL || secondNode == NULL){
+        return;
     }
-    newNode->m_remainedFriends = friendQuota;
-    newNode->m_reminedRivals = rivalQuota;
-    node->m_nextNode = newNode;
-    newNode->m_prevNode = node;
-    newNode->m_nextNode = NULL;
-    return newNode;
+    Node temp = firstNode->m_nextNode;
+    firstNode->m_nextNode = secondNode;
+    secondNode->m_prevNode = firstNode;
+    secondNode->m_nextNode = temp;
 }
 
 void destroyFromStart(Node head){
-    if(head->m_nextNode != NULL){
+    if(head->m_prevNode != NULL){
         return;
     }
     while(head){
         Node delete = head;
-        head = head->m_prevNode;
+        head = head->m_nextNode;
         free(delete);
     }
 }
