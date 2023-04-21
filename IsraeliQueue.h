@@ -2,9 +2,11 @@
 #define PROVIDED_ISRAELIQUEUE_H
 
 #include <stdbool.h>
+#include "QueueData.h"
 
 #define FRIEND_QUOTA 5
 #define RIVAL_QUOTA 3
+
 
 typedef struct IsraeliQueue_t * IsraeliQueue;
 
@@ -19,6 +21,8 @@ typedef enum { ISRAELIQUEUE_SUCCESS, ISRAELIQUEUE_ALLOC_FAILED, ISRAELIQUEUE_BAD
  * ISRAELIQUEUE_BAD_PARAM: Indicates an illegal parameter was passed.
  * ISRAELI_QUEUE_ERROR: Indicates any error beyond the above.
  * */
+
+
 
 /**Creates a new IsraeliQueue_t object with the provided friendship functions, a NULL-terminated array,
  * comparison function, friendship threshold and rivalry threshold. Returns a pointer
