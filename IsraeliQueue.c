@@ -140,7 +140,7 @@ IsraeliQueueError IsraeliQueueEnqueue(IsraeliQueue ilQueue, void * item){
                     }
                     else{
                         double average = (double)friendshipValue / (double)j;
-                        if(average < ilQueue->m_rivalryThreshold){
+                        if(average < ilQueue->m_rivalryThreshold && searchRival->m_reminedRivals > 0){
                             searchRival->m_reminedRivals--;
                             break;
                         }
@@ -148,12 +148,13 @@ IsraeliQueueError IsraeliQueueEnqueue(IsraeliQueue ilQueue, void * item){
                     searchRival = searchRival->m_nextNode;
                 }
                 //* If we didnt find rivals we connect the new node after it's friend.
-                if(searchRival == NULL) {
+                if(searchRival == NULL && searchFriend->m_remainedFriends > 0) {
                     connectNodes(searchFriend,newNode);
                     if(ilQueue->m_tail == searchFriend){
                         ilQueue->m_tail = newNode;
                     }
                     searchFriend->m_remainedFriends--;
+                    return ISRAELIQUEUE_SUCCESS;
                 }
             }
             i++;
