@@ -1,0 +1,54 @@
+#include "HackerEnrollment.h"
+
+#include <stdlib.h>
+
+int main(){
+    FILE* studentsFile = fopen("C:\\Users\\idota\\CLionProjects\\untitled2\\students.txt","r");
+    if(studentsFile==NULL){
+        return 0;
+    }
+    FILE* hackersFile = fopen("C:\\Users\\idota\\CLionProjects\\untitled2\\hackers.txt","r");
+    FILE* coursesFile = fopen("C:\\Users\\idota\\CLionProjects\\untitled2\\courses.txt","r");
+    FILE* queueFile = fopen("C:\\Users\\idota\\CLionProjects\\untitled2\\queues.txt","r");
+    FILE* targetFile = fopen("C:\\Users\\idota\\CLionProjects\\untitled2\\out.txt","r");
+    EnrollmentSystem newSystem = createEnrollment(studentsFile,coursesFile,hackersFile);
+    if(newSystem==NULL){
+        return 0;
+    }
+    readEnrollment(newSystem,queueFile);
+    if(newSystem==NULL){
+        return 0;
+    }
+    FriendshipFunction* functionsArray = malloc(sizeof(*functionsArray)*4);
+    if(!functionsArray){
+        return 0;
+    }
+    Course course = newSystem->m_coursesArray[0];
+    int i=1;
+    while(course != NULL){
+        if(course->m_ilQueue != NULL){
+            IsraeliQueue courseQueue = course->m_ilQueue;
+            IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)compareIds);
+            IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)checkFileConnection);
+            IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)nameCompareCaseSensitive);
+        }
+        course = newSystem->m_coursesArray[i++];
+    }
+    hackEnrollment(newSystem,targetFile);
+    course = newSystem->m_coursesArray[0];
+    i=1;
+    while(course != NULL) {
+        if (course->m_ilQueue != NULL) {
+            IsraeliQueueDestroy(course->m_ilQueue);
+        }
+        course = newSystem->m_coursesArray[i++];
+
+    }
+    free(functionsArray);
+    fclose(studentsFile);
+    fclose(hackersFile);
+    fclose(coursesFile);
+    fclose(queueFile);
+    fclose(targetFile);
+    return 0;
+}

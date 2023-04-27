@@ -18,17 +18,16 @@ typedef struct Node{
  * In case of failure, return NULL.*/
 Node createNode(void*, int, int);
 
-/**Connect a Node object after an already placed Node.
- * In case of Null parameter does nothing.*/
+/** Connect a Node object after an already placed Node.
+ *  In case of Null parameter does nothing.*/
 void connectNodes(Node , Node);
 
-/**@param head: the first node in the queue
- *
- * Deallocates all the nodes at the queue
- * 
- * Notice: in case of not passing the head of the queue an error message will be printed - no deallocation in this case!*/
+/** @param head: the first node in the queue
+ *  Deallocates all the nodes at the queue
+ * Notice: in case of not passing the head of the queue an error message will be printed - no freeing memory in this case!*/
 void destroyFromStart(Node head);
 
-
+/** Disconnecting a Node passed as parameter - This function does not freeing the memory of the node! */
+void disconnectNode (Node);
 
 #endif // NODE_H 
