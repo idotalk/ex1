@@ -4,7 +4,6 @@
 #include "HackerEnrollment.h"
 #include "IsraeliQueue.h"
 
-#define CHARBUFFER 10240
 
 /** NOTICE! this function can be called only from HackerEnrollment.c file.
  *  Create a students array for Enrollment System using the data in a file provided.
@@ -31,12 +30,18 @@ static Course searchCourse (int courseID, EnrollmentSystem system);
  *  If student isn't in the system NULL is returned */
 static pStudent searchStudent (unsigned int studentID, EnrollmentSystem system);
 
+/** NOTICE! this function can be called only from HackerEnrollment.c file.
+ *  Print to file if couldn't match at least one hacker demands. */
 static void printNotMatched(unsigned int arr[], FILE *out,int index);
 
-static void printToFile(pHacker hacker, EnrollmentSystem system, FILE* out);
+/** NOTICE! this function can be called only from HackerEnrollment.c file.
+ *  Returns the foremost position of the student in a queue by ID.
+ *  In case of failure return -1 */
+static int positionInQueue(IsraeliQueue ilQueue, pStudent student);
 
-static int positionInArray(IsraeliQueue ilQueue, pStudent student);
-
+/** NOTICE! this functions can be called only from HackerEnrollment.c file.
+ *  In case of success in Hack enrollment, print to file all the courses enrollment queues. */
+static void printToFile(EnrollmentSystem system, FILE* out);
 static void printQueue(IsraeliQueue ilQueue, FILE* out);
 
 
@@ -81,14 +86,17 @@ EnrollmentSystem createEnrollment(FILE* students, FILE* courses, FILE* hackers){
 }
 
 EnrollmentSystem readEnrollment(EnrollmentSystem system, FILE* queues){
-    int courseID;
+    int courseID, longestLine = longestLineInFile(queues);
     unsigned int ID;
-    char buffer[CHARBUFFER];
+    char *buffer = malloc(longestLine + 1);
+    if(!buffer){
+        return NULL;
+    }
     while (fscanf(queues, "%d", &courseID)==1){
         Course currentCourse = searchCourse(courseID,system);
         ComparisonFunction compareFunction = compare;
         IsraeliQueue enrollmentQueue = IsraeliQueueCreate(NULL,compareFunction,FRIENDSHIPTHRESHOLD,RIVALYTHRESHOLD);
-        fgets(buffer, CHARBUFFER, queues);
+        fgets(buffer, longestLine + 1, queues);
         char *token = strtok(buffer, " ");
         while (token){
             sscanf(token, "%u", &ID);
@@ -101,6 +109,7 @@ EnrollmentSystem readEnrollment(EnrollmentSystem system, FILE* queues){
         }
         currentCourse->m_ilQueue = enrollmentQueue;
     }
+    free(buffer);
     return system;
 }
 
@@ -111,7 +120,7 @@ void hackEnrollment(EnrollmentSystem system, FILE* out) {
     }
     unsigned int *notMatched = malloc(sizeof (unsigned int) * system->m_hackersAmount);
     if(!notMatched){
-        return;
+        exit(1); //Out of memory - void function at the end of main.
     }
     for (int i = 0; i < system->m_hackersAmount; i++){
         notMatched[i]=0;
@@ -124,37 +133,64 @@ void hackEnrollment(EnrollmentSystem system, FILE* out) {
             Course desiredCourse = searchCourse(hacker->m_desiredCourses[j], system);
             IsraeliQueue courseQueue = desiredCourse->m_ilQueue;
             if (courseQueue == NULL && desiredCourse->m_courseSize > 1) {
+                IsraeliQueue newQueue = IsraeliQueueCreate(NULL,NULL,FRIENDSHIPTHRESHOLD,RIVALYTHRESHOLD);
+                if(!newQueue){
+                    exit(1); //Out of memory - void function at the end of main.
+                }
+                pStudent currentStudent = searchStudent(hacker->m_hackerID,system);
+                IsraeliQueueError errorCheck = IsraeliQueueEnqueue(newQueue,currentStudent);
+                if(errorCheck!=ISRAELIQUEUE_SUCCESS){
+                    exit(1); //Failure occurred - void function at the end of main.
+                }
+                desiredCourse->m_ilQueue = newQueue;
                 constraintsMatched++;
             } else {
-                if (IsraeliQueueContains(courseQueue, hacker->m_studentData)) {
-                    IsraeliQueueError errorCheck = IsraeliQueueImprovePositions(courseQueue);
-                    if (errorCheck != ISRAELIQUEUE_SUCCESS) {
-                        return;
-                    }
-                } else {
-                    IsraeliQueueError errorCheck = IsraeliQueueEnqueue(courseQueue, hacker->m_studentData);
-                    if (errorCheck != ISRAELIQUEUE_SUCCESS) {
-                        return;
-                    }
-
+                IsraeliQueueError errorCheck = IsraeliQueueEnqueue(courseQueue, hacker->m_studentData);
+                if (errorCheck != ISRAELIQUEUE_SUCCESS) {
+                    exit(1); //Out of memory - void function at the end of main.
                 }
-                int position = positionInArray(courseQueue, hacker->m_studentData);
+                int position = positionInQueue(courseQueue, hacker->m_studentData);
                 if (position == -1) {
-                    return;
+                    exit(1); //Out of memory - void function at the end of main.
                 }
                 if (position < desiredCourse->m_courseSize) {
                     constraintsMatched++;
                 }
             }
         }
-        if (constraintsMatched < 2 && hacker->m_amountDesired >= 2) {
+        if ((constraintsMatched < 2 && hacker->m_amountDesired >= 2) ||
+        (constraintsMatched == 0 && hacker->m_amountDesired == 1)) {
             notMatched[notMatchedIndex++] = hacker->m_hackerID;
-        } else {
-            printToFile(hacker,system,out);
         }
     }
-    printNotMatched(notMatched,out,notMatchedIndex);
+    if(notMatchedIndex > 0){
+        printNotMatched(notMatched,out,notMatchedIndex);
+    } else {
+        printToFile(system,out);
+    }
+    free(notMatched);
 }
+
+void addFriendshipFunctions(EnrollmentSystem system, int offset){
+    Course course = system->m_coursesArray[0];
+    int i=1;
+    while(course != NULL){
+        if(course->m_ilQueue != NULL){
+            IsraeliQueue courseQueue = course->m_ilQueue;
+            IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)compareIds);
+            IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)checkFileConnection);
+            if (offset == 1){
+                IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)nameCompareCaseInsensitive);
+            }
+            else{
+                IsraeliQueueAddFriendshipMeasure(courseQueue,(FriendshipFunction)nameCompareCaseSensitive);
+            }
+
+        }
+        course = system->m_coursesArray[i++];
+    }
+}
+
 
 static void printNotMatched(unsigned int arr[], FILE *out, int index){
     if(arr[0] == 0 || out == NULL){
@@ -166,22 +202,18 @@ static void printNotMatched(unsigned int arr[], FILE *out, int index){
     }
 }
 
-static void printToFile(pHacker hacker, EnrollmentSystem system, FILE* out) {
-    if(system == NULL || out==NULL || hacker== NULL){
+static void printToFile(EnrollmentSystem system, FILE* out) {
+    if(system == NULL || out==NULL){
         return;
     }
-    for (int i=0; i<hacker->m_amountDesired; i++){
-        Course desiredCourse = searchCourse(hacker->m_desiredCourses[i], system);
-        IsraeliQueue courseQueue = desiredCourse->m_ilQueue;
-        if (courseQueue == NULL && desiredCourse->m_courseSize > 1) {
-            fprintf(out,"%d %u\n",desiredCourse->m_courseID,hacker->m_hackerID);
-        } else {
-            int position = positionInArray(courseQueue, hacker->m_studentData);
-            if (position < desiredCourse->m_courseSize && position != -1){
-                fprintf(out,"%d ", desiredCourse->m_courseID);
-                printQueue(courseQueue,out);
-            }
+    for (int i=0; i< system->m_courseAmount ; i++){
+        Course courseToPrint = system->m_coursesArray[i];
+        IsraeliQueue courseQueue = courseToPrint->m_ilQueue;
+        if(courseQueue != NULL){
+            fprintf(out,"%d ", courseToPrint->m_courseID);
+            printQueue(courseQueue,out);
         }
+        fprintf(out,"\n");
     }
 }
 
@@ -193,23 +225,26 @@ static void printQueue(IsraeliQueue ilQueue, FILE* out){
     }
 }
 
-static int positionInArray(IsraeliQueue ilQueue, pStudent student){
+static int positionInQueue(IsraeliQueue ilQueue, pStudent student){
     IsraeliQueue clonedQueue = IsraeliQueueClone(ilQueue);
     if (!clonedQueue){
         return -1;
     }
     int count = 0;
     while (IsraeliQueueContains(clonedQueue,student)){
-        IsraeliQueueDequeue(clonedQueue);
+        pStudent helper = (pStudent)IsraeliQueueDequeue(clonedQueue);
         count++;
+        if(helper->m_studentID == student->m_studentID) {
+            break;
+        }
     }
     IsraeliQueueDestroy(clonedQueue);
     return count;
 }
 
-
 static bool readStudentData(EnrollmentSystem system, FILE* studentsFile){
     int countStudents = countLinesInFile(studentsFile);
+    int longestLine = longestLineInFile(studentsFile);
     system->m_studentsAmount = countStudents;
     pStudent *studentsArray = malloc(sizeof(pStudent) * (countStudents+1));
     if (!studentsArray){
@@ -218,13 +253,23 @@ static bool readStudentData(EnrollmentSystem system, FILE* studentsFile){
     studentsArray[countStudents] = NULL;
     unsigned int studentID;
     int studentGPA,totalCredits;
-    char name[CHARBUFFER], surname[CHARBUFFER], city[CHARBUFFER], department[CHARBUFFER];
+    char *name = malloc(longestLine + 1);
+    char *surname = malloc(longestLine + 1);
+    char *city = malloc(longestLine + 1);
+    char *department = malloc(longestLine + 1);
+    if(!name || !surname || !city || !department){
+        return false;
+    }
     for (int i = 0; i < countStudents; i++) {
         fscanf(studentsFile,"%u %d %d %s %s %s %s",&studentID,&totalCredits,
                &studentGPA,name,surname,city,department);
         pStudent newStudent = createStudent(studentID,totalCredits,studentGPA,name,surname,city,department,NULL ,NULL);
         studentsArray[i] = newStudent;
     }
+    free(name);
+    free(surname);
+    free(city);
+    free(department);
     system->m_studentsArray = studentsArray;
     rewind(studentsFile);
     return true;
@@ -251,37 +296,34 @@ static bool readCoursesData(EnrollmentSystem system, FILE* coursesFile){
 
 static bool readHackersData(EnrollmentSystem system, FILE* hackersFile,int countCourses, int countStudents){
     int countHackers = countLinesInFile(hackersFile)/4;
+    int longestLine = longestLineInFile(hackersFile);
     system->m_hackersAmount = countHackers;
     pHacker* hackersArray = malloc(sizeof(pHacker) * (countHackers+1));
     if(!hackersArray){
         return false;
     }
-    int hackerIndex = 0;
-    int *coursesDesired = malloc(sizeof(int) * countCourses);
-    if(!coursesDesired){
+    char *buffer = malloc(longestLine + 1);
+    if(!buffer){
         return false;
     }
-    for(int i=0;i<countCourses;i++){
-        coursesDesired[i]=0;
-    }
-    unsigned int *rivalsStudents = malloc(sizeof(unsigned int)*countStudents);
-    if(!rivalsStudents){
-        return false;
-    }
-    unsigned int *friendsStudents = malloc(sizeof(unsigned int)*countStudents);
-    if(!friendsStudents){
-        return false;
-    }
-    for(int i=0;i<countStudents;i++){
-        friendsStudents[i]=0;
-        rivalsStudents[i]=0;
-    }
-    char buffer[CHARBUFFER];
     unsigned int hackerId, helperBuffer;
-    int course, a=0, b=0, c=0; //a - index for courses array b - for rivals c - for friends
+    int hackerIndex = 0 ,course, a=0, b=0, c=0; //a - index for courses array b - for rivals c - for friends
     for(int i=0; i<countHackers; i++) {
+        int *coursesDesired = malloc(sizeof(int) * countCourses);
+        unsigned int *rivalsStudents = malloc(sizeof(unsigned int)*countStudents);
+        unsigned int *friendsStudents = malloc(sizeof(unsigned int)*countStudents);
+        if(!rivalsStudents || !friendsStudents || !coursesDesired){
+            return false;
+        }
+        for(int q=0; q<countCourses; q++){
+            coursesDesired[q]=-1;
+        }
+        for(int k=0;k<countStudents;k++){
+            friendsStudents[k]=0;
+            rivalsStudents[k]=0;
+        }
         for (int j = 0; j < 4; j++) {
-            fgets(buffer, CHARBUFFER, hackersFile);
+            fgets(buffer, longestLine + 1 , hackersFile);
             char *token = strtok(buffer, " ");
             while (token) {
                 switch (j) {
@@ -304,14 +346,12 @@ static bool readHackersData(EnrollmentSystem system, FILE* hackersFile,int count
                 token = strtok(NULL, " ");
             }
         }
-        coursesDesired[a] = -1;
-        friendsStudents[c] = 0;
-        rivalsStudents[b] = 0;
         pHacker newHacker = createHacker(hackerId,coursesDesired,a,friendsStudents,rivalsStudents,NULL);
         hackersArray[hackerIndex++] = newHacker;
     }
     hackersArray[hackerIndex] = NULL;
     system->m_hackerArray = hackersArray;
+    free(buffer);
     return true;
 }
 

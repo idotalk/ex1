@@ -40,8 +40,17 @@ void destroyFromStart(Node head){
 }
 
 void disconnectNode (Node node){
-    Node helper = node->m_prevNode;
-    helper->m_nextNode = node->m_nextNode;
+    if(node == NULL){
+        return;
+    }
+    Node tempPrev = node->m_prevNode;
+    Node tempNext = node->m_nextNode;
+    if(tempNext!=NULL){
+        tempNext->m_prevNode = tempPrev;
+    }
+    if(tempPrev!=NULL){
+     tempPrev->m_nextNode = tempNext;
+    }
     node->m_nextNode = NULL;
     node->m_prevNode = NULL;
 }

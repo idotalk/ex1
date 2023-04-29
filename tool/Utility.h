@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "IsraeliQueue.h"
 
+/** Structs declaration - Arrays fields are NULL terminated. */
 typedef struct Student{
     unsigned int m_studentID;
     int m_studentGPA;
@@ -31,19 +32,31 @@ typedef struct Course{
     IsraeliQueue m_ilQueue;
 }* Course;
 
+/** Create new course struct.
+ *  @see: Course struct declaration for parameters.
+ *  In case of failure returns NULL. */
 Course createCourse(int,int, IsraeliQueue);
 
+/** Create new Student struct.
+ *  @see: Student struct declaration for parameters.
+ *  In case of failure returns NULL. */
 pStudent createStudent(unsigned int, int, int, char*, char*, char*, char*,unsigned int*,unsigned int*);
 
+/** Create new Hacker struct.
+ *  @see: Hacker struct declaration for parameters.
+ *  In case of failure returns NULL. */
 pHacker createHacker(unsigned int, int*,int, unsigned int*, unsigned int*, pStudent);
 
+/** Count lines in file - rewind the pointer at the end to the head of the file. */
 int countLinesInFile(FILE*);
 
+/** Return the longest line in file - rewind the pointer at the end to the head of the file. */
+int longestLineInFile(FILE*);
+
+/** Friendship and comparison functions. */
 int compareIds(void* ,void*);
 int nameCompareCaseSensitive(void* ,void*);
 int nameCompareCaseInsensitive(void* ,void*);
-int valueCaseSensitive(char*);
-int valueCaseInsensitive(char*);
 int checkFileConnection(void* firstItem, void* secondItem);
 int compare(void*, void*);
 

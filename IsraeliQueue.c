@@ -20,12 +20,11 @@ typedef struct IsraeliQueue_t {
 
 /** NOTICE! this function can be called only from IsraeliQueue.c file.
  *  Returns a Node pointer to the foremost friend which is possible to enqueue a new Node after it.
- *  If friend didn't found, returns endSearch.
+ *  If friend didn't found, returns NULL.
  *  @param ilQueue: IsraeliQueue object.
  *  @param toEnqueue: the new Node you want to insert to the Queue.
- *  @param startSearch: where to start the search for a valid friend (usually would be the queue head).
- *  @param endSearch: where to end the search for a valid friend. */
-static Node findFriend (IsraeliQueue ilQueue ,Node toEnqueue,Node startSearch, Node endSearch);
+ *  @param startSearch: where to start the search for a valid friend (usually would be the queue head). */
+static Node findFriend (IsraeliQueue ilQueue ,Node toEnqueue,Node startSearch);
 
 /** NOTICE! this function can be called only from IsraeliQueue.c file.
  *  Return the current amount of friendship functions in the Queue that passed as parameter */
@@ -42,6 +41,14 @@ static void copyFunctionsArray (IsraeliQueue ilQueue, FriendshipFunction* newArr
  *  Enqueue a given node to the Queue */
 static IsraeliQueueError enQueue(IsraeliQueue ilQueue, Node newNode);
 
+/** NOTICE! this function can be called only from IsraeliQueue.c file.
+ *             *** Use only for IsraeliQueueMerge! ***
+ *  Calculating the new friendship and rivalry for merging queues.
+ *  Calculating amount of queues in the array and the longest queue length.
+ *  This function does not return value, it changes an int data, pass by address! */
+static void calculateNewThresholds(IsraeliQueue* ilQueueArray,int *queuesAmount ,int *newFriendshipThreshold,
+                                   int *newRivalThreshold, int *maxQueueLength);
+
 //Functions implementation
 
 IsraeliQueue IsraeliQueueCreate(FriendshipFunction *functionsArray, ComparisonFunction compareFunction,
@@ -50,7 +57,24 @@ IsraeliQueue IsraeliQueueCreate(FriendshipFunction *functionsArray, ComparisonFu
     if(!newQueue){
         return NULL;
     }
-    newQueue->m_friendshipFunctions = functionsArray;
+    int functionsAmount = 0,i=0;
+    while (functionsArray[i++]){
+        functionsAmount++;
+    }
+    if(functionsAmount > 0){
+        FriendshipFunction *newFunctionsArray = malloc(sizeof(FriendshipFunction) * (functionsAmount + 1));
+        if(!newFunctionsArray){
+            return NULL;
+        }
+        newFunctionsArray[functionsAmount] = NULL;
+        i=0;
+        while (functionsArray[i++]){
+            newFunctionsArray[i] = functionsArray[i];
+        }
+        newQueue->m_friendshipFunctions = newFunctionsArray;
+    } else{
+        newQueue->m_friendshipFunctions = NULL;
+    }
     newQueue->m_compareFunction = compareFunction;
     newQueue->m_friendshipThreshold = friendship_th;
     newQueue->m_rivalryThreshold = rivalry_th;
@@ -107,6 +131,7 @@ void IsraeliQueueDestroy(IsraeliQueue ilQueue){
         return;
     }
     destroyFromStart(ilQueue->m_head);
+    free(ilQueue->m_friendshipFunctions);
     free (ilQueue);
 }
 
@@ -242,6 +267,9 @@ IsraeliQueueError IsraeliQueueImprovePositions(IsraeliQueue ilQueue){
         if(errorCheck != ISRAELIQUEUE_SUCCESS){
             return errorCheck;
         }
+        if(ilQueue->m_tail->m_nextNode == currentNode){
+            ilQueue->m_tail = currentNode;
+        }
     }
     free(nodesArray);
     return ISRAELIQUEUE_SUCCESS;
@@ -257,16 +285,8 @@ IsraeliQueue IsraeliQueueMerge(IsraeliQueue* ilQueueArray, ComparisonFunction co
     }
     mergedQueue->m_compareFunction = compareFunction;
     //* Calculating new thresholds.
-    int queuesAmount = 0, sumFriendshipThreshold = 0, multiplyRivalThreshold = 1, maxQueueLength = 0;
-    while(ilQueueArray[queuesAmount++] != NULL){
-        IsraeliQueue currentQueue = ilQueueArray[queuesAmount];
-        sumFriendshipThreshold += currentQueue->m_friendshipThreshold;
-        multiplyRivalThreshold *= currentQueue->m_rivalryThreshold;
-        int len = IsraeliQueueSize(ilQueueArray[queuesAmount]);
-        maxQueueLength = len > maxQueueLength ? len : maxQueueLength;
-    }
-    int newFriendshipThreshold = (int)ceil(((double)sumFriendshipThreshold / (double)queuesAmount));
-    int newRivalThreshold = (int)ceil(pow(multiplyRivalThreshold, 1/(double)queuesAmount));
+    int queuesAmount = 0, maxQueueLength = 0, newFriendshipThreshold=0 ,newRivalThreshold=0;
+    calculateNewThresholds(ilQueueArray, &queuesAmount ,&newFriendshipThreshold,&newRivalThreshold, &maxQueueLength);
     mergedQueue->m_friendshipThreshold = newFriendshipThreshold;
     mergedQueue->m_rivalryThreshold = newRivalThreshold;
 
@@ -288,7 +308,7 @@ IsraeliQueue IsraeliQueueMerge(IsraeliQueue* ilQueueArray, ComparisonFunction co
     for(int i = 0; i < queuesAmount; i++){
         IsraeliQueue temp = ilQueueArray[i];
         int j=0;
-        while (temp->m_friendshipFunctions[j++]){
+        while (temp->m_friendshipFunctions[j++] != NULL){
             for (int k=0; k < countFunction; k++) {
                 if (newArray[k] == temp->m_friendshipFunctions[j]) {
                     continue;
@@ -298,7 +318,6 @@ IsraeliQueue IsraeliQueueMerge(IsraeliQueue* ilQueueArray, ComparisonFunction co
             }
         }
     }
-    newArray[index] = NULL;
     mergedQueue->m_friendshipFunctions = newArray;
 
     // Cloning all Queues items to the merged queue.
@@ -309,9 +328,11 @@ IsraeliQueue IsraeliQueueMerge(IsraeliQueue* ilQueueArray, ComparisonFunction co
             for(int i=0; i<posInQueue && currentNode!= NULL; i++){
                 currentNode = currentNode->m_nextNode;
             }
-            if(currentNode != NULL && IsraeliQueueContains(mergedQueue,currentNode) == 0){
+            if(currentNode != NULL){
                 IsraeliQueueError error = IsraeliQueueEnqueue(mergedQueue, currentNode->m_data);
                 if(error!=ISRAELIQUEUE_SUCCESS) {
+                    free(newArray);
+                    IsraeliQueueDestroy(mergedQueue);
                     return NULL;
                 }
             }
@@ -320,9 +341,25 @@ IsraeliQueue IsraeliQueueMerge(IsraeliQueue* ilQueueArray, ComparisonFunction co
     return mergedQueue;
 }
 
-
+static void calculateNewThresholds(IsraeliQueue* ilQueueArray,int *queuesAmount ,int *newFriendshipThreshold,
+                                   int *newRivalThreshold, int *maxQueueLength){
+    int sumFriendshipThreshold = 0, multiplyRivalThreshold = 1;
+    int maxLength = *maxQueueLength;
+    int amount = *queuesAmount;
+    while(ilQueueArray[amount++] != NULL){
+        IsraeliQueue currentQueue = ilQueueArray[amount];
+        sumFriendshipThreshold += currentQueue->m_friendshipThreshold;
+        multiplyRivalThreshold *= currentQueue->m_rivalryThreshold;
+        int len = IsraeliQueueSize(currentQueue);
+        maxLength = len > maxLength ? len : maxLength;
+    }
+    *queuesAmount = amount;
+    *maxQueueLength = maxLength;
+    *newFriendshipThreshold = (int)ceil(((double)sumFriendshipThreshold / (double)amount));
+    *newRivalThreshold = (int)ceil(pow(multiplyRivalThreshold, 1/(double)amount));
+}
 // @see: Declaration + documentation at the beginning of this file.
-static Node findFriend (IsraeliQueue ilQueue ,Node toEnqueue,Node startSearch, Node endSearch){
+static Node findFriend (IsraeliQueue ilQueue ,Node toEnqueue,Node startSearch){
     int countFunctions = numberOfFriendshipFunctions(ilQueue,NULL);
     Node searchFriend = startSearch;
     while(searchFriend != NULL){
@@ -384,7 +421,7 @@ static IsraeliQueueError enQueue(IsraeliQueue ilQueue, Node newNode){
         ilQueue->m_tail = newNode;
         return ISRAELIQUEUE_SUCCESS;
     }
-    Node searchFriend = findFriend(ilQueue, newNode, ilQueue->m_head, NULL);
+    Node searchFriend = findFriend(ilQueue, newNode, ilQueue->m_head);
     if(searchFriend == NULL){
         connectNodes(ilQueue->m_tail, newNode);
         ilQueue->m_tail = newNode;

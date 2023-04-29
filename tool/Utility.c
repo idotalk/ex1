@@ -1,6 +1,27 @@
 #include "Utility.h"
 #include <stdlib.h>
 #include <string.h>
+
+
+// Local functions declaration.
+/** NOTICE! this function can be called only from HackerEnrollment.c file.
+ *  Return ASCII value of string - case sensitive */
+static int valueCaseSensitive(char*);
+/** Return ASCII value of string - case insensitive */
+static int valueCaseInsensitive(char*);
+
+/** NOTICE! this function can be called only from HackerEnrollment.c file.
+ *  In case one of the students passed to the function is hacker:
+ *  Returns if the students are friends by the Hackers file provided in Create Enrollment.
+ *  Return value: 20 if friends, 0 otherwise. */
+static int isFriendsByFile(pStudent student1, pStudent student2);
+
+/** NOTICE! this function can be called only from HackerEnrollment.c file.
+ *  In case one of the students passed to the function is hacker:
+ *  Returns if the students are rivals by the Hackers file provided in Create Enrollment.
+ *  Return value: -20 if rivals, 0 otherwise. */
+static int isRivalsByFile(pStudent student1, pStudent student2);
+
 Course createCourse(int courseID,int size, IsraeliQueue ilQueue){
     Course newCourse = malloc(sizeof(*newCourse));
     if(!newCourse){
@@ -88,6 +109,23 @@ int countLinesInFile(FILE* file){
     return lines;
 }
 
+int longestLineInFile(FILE* file){
+    if(file==NULL){
+        return 0;
+    }
+    int longest = 0, count=0;
+    int i;
+    while((i=fgetc(file))!=EOF) {
+        count++;
+        if(i=='\n'){
+            longest = count>longest? count: longest;
+            count = 0;
+        }
+    }
+    rewind(file);
+    return longest;
+}
+
 int compareIds(void* firstItem, void* secondItem){
     if(firstItem == NULL || secondItem == NULL){
         return 0;
@@ -109,14 +147,6 @@ int nameCompareCaseSensitive(void* firstItem, void* secondItem){
     return abs(sumFirstStudent - sumSecondStudent);
 }
 
-int valueCaseSensitive(char* str){
-    int sum = 0;
-    while(*str++){
-        sum+= *str;
-    }
-    return sum;
-}
-
 int nameCompareCaseInsensitive(void* firstItem, void* secondItem){
     if(firstItem == NULL || secondItem == NULL){
         return 0;
@@ -129,7 +159,34 @@ int nameCompareCaseInsensitive(void* firstItem, void* secondItem){
 
 }
 
-int valueCaseInsensitive(char* str){
+int checkFileConnection(void* firstItem, void* secondItem){
+    if(firstItem == NULL || secondItem == NULL){
+        return 0;
+    }
+    pStudent student1 = (pStudent)firstItem;
+    pStudent student2 = (pStudent)secondItem;
+    return isFriendsByFile(student1,student2) + isRivalsByFile(student1,student2);
+}
+
+int compare(void* firstItem, void* secondItem){
+    pStudent student1 = (pStudent)firstItem;
+    pStudent student2 = (pStudent)secondItem;
+    if(student2->m_studentID == student1->m_studentID){
+        return 1;
+    } else return 0;
+}
+
+
+
+static int valueCaseSensitive(char* str){
+    int sum = 0;
+    while(*str++){
+        sum+= *str;
+    }
+    return sum;
+}
+
+static int valueCaseInsensitive(char* str){
     int sum = 0;
     while(*str++){
         if(*str >= 'a' && *str <='z'){
@@ -166,6 +223,7 @@ static int isFriendsByFile(pStudent student1, pStudent student2){
     }
     return 0;
 }
+
 static int isRivalsByFile(pStudent student1, pStudent student2){
     printf("%u %u\n",student1->m_studentID,student2->m_studentID);
     if(student1->m_rivalsStudents == NULL && student2->m_rivalsStudents == NULL){
@@ -189,21 +247,4 @@ static int isRivalsByFile(pStudent student1, pStudent student2){
         i++;
     }
     return 0;
-}
-
-int checkFileConnection(void* firstItem, void* secondItem){
-    if(firstItem == NULL || secondItem == NULL){
-        return 0;
-    }
-    pStudent student1 = (pStudent)firstItem;
-    pStudent student2 = (pStudent)secondItem;
-    return isFriendsByFile(student1,student2) + isRivalsByFile(student1,student2);
-}
-
-int compare(void* firstItem, void* secondItem){
-    pStudent student1 = (pStudent)firstItem;
-    pStudent student2 = (pStudent)secondItem;
-    if(student2->m_studentID == student1->m_studentID){
-        return 1;
-    } else return 0;
 }

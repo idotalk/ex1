@@ -37,5 +37,6 @@ EnrollmentSystem readEnrollment(EnrollmentSystem, FILE*);
  *  In case of failure an error message would be printed to stderr and the function will abort. */
 void hackEnrollment(EnrollmentSystem, FILE*);
 
+void addFriendshipFunctions(EnrollmentSystem system, int offset);
 
 #endif //HACKERENROLLMENT_H
